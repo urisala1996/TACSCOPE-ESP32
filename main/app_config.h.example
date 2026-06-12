@@ -1,0 +1,45 @@
+/*
+ * TACSCOPE — user configuration
+ * =============================
+ * Copy this file to app_config.h and fill in your own values.
+ * app_config.h is gitignored so your credentials and location stay private.
+ */
+#pragma once
+
+/* ---------------------------------------------------------------- Wi-Fi -- */
+#define WIFI_SSID               "your-network-name"
+#define WIFI_PASS               "your-password"
+
+/* ------------------------------------------------------- Radar position -- */
+/* The center of the scope (your location), decimal degrees.
+ * Tip: right-click your location in Google Maps → "Copy coordinates". */
+#define HOME_LAT                0.0
+#define HOME_LON                0.0
+
+/* ----------------------------------------------------------- Data source -- */
+/* Free ADS-B aggregators, NO API key required. Pick one:
+ *   "https://api.adsb.lol"        (default)
+ *   "https://api.airplanes.live"  (same response format)
+ * Endpoint used: <base>/v2/point/<lat>/<lon>/<radius_nm>            */
+#define ADSB_BASE_URL           "https://api.adsb.lol"
+
+/* Radius requested from the API, in NAUTICAL MILES (max 250).
+ * Keep it >= your largest display range (100 km ~ 54 nm).           */
+#define FETCH_RADIUS_NM         60
+
+/* Seconds between data refreshes. Be polite to the free API: >= 5.  */
+#define REFRESH_INTERVAL_S      10
+
+/* Show aircraft reported on the ground (airport surface clutter).   */
+#define SHOW_GROUND_TARGETS     0
+
+/* --------------------------------------------------------------- Display -- */
+/* Selectable display ranges in km (tap empty scope area to cycle).  */
+#define RANGE_STEPS_KM          { 10, 25, 50, 100 }
+#define RANGE_STEP_DEFAULT      2       /* index into the list above (50 km) */
+
+/* Backlight brightness, 1..100 %                                     */
+#define BACKLIGHT_PCT           100
+
+/* If red and blue appear swapped on your panel, set this to 0.       */
+#define DISPLAY_BGR             1
