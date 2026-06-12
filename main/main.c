@@ -1,6 +1,7 @@
 /* TACSCOPE — military-style live air traffic radar
  * Board: ESP32-2424S012 (ESP32-C3 + 1.28" round GC9A01 + CST816D touch)
- * Edit main/app_config.h before flashing.
+ * Wi-Fi and location are configured on-device; app_config.h holds the
+ * fallbacks. Press the side (BOOT) button to (re)open the setup portal.
  */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -10,7 +11,11 @@
 #include "display.h"
 #include "gfx.h"
 #include "touch.h"
+#include "button.h"
+#include "config.h"
 #include "wifi.h"
+#include "geoloc.h"
+#include "provision.h"
 #include "adsb.h"
 #include "radar.h"
 #include "app_config.h"
@@ -24,6 +29,7 @@ void app_main(void)
     /* Allocate the framebuffer first, while heap is unfragmented. */
     ESP_ERROR_CHECK(gfx_init() ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_ERROR_CHECK(display_init());
+    button_init();
 
     radar_boot_begin();
     boot_pause();
@@ -37,6 +43,7 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+    config_load();
     radar_boot_line("NVS STORE", "OK", false);
     boot_pause();
 
@@ -49,21 +56,40 @@ void app_main(void)
     radar_boot_line("RF CAL", "OK", false);
     boot_pause();
 
+    /* No credentials yet -> go straight to the on-device setup portal. */
+    if (!config_has_wifi()) {
+        radar_boot_line("WIFI CFG", "SETUP", true);
+        boot_pause();
+        provision_run();            /* never returns (reboots after save) */
+    }
+
     wifi_start();
     radar_boot_line("WIFI LINK", "....", false);
     bool connected = wifi_wait_connected(20000);
     radar_boot_line("WIFI LINK", connected ? "OK" : "FAIL", !connected);
     if (!connected) {
-        radar_boot_line("CHECK CONFIG", "!!", true);
-        ESP_LOGE(TAG, "WiFi failed; check app_config.h. Retrying in bg.");
+        radar_boot_line("BTN = SETUP", "", false);
+        ESP_LOGE(TAG, "WiFi failed; press side button to reconfigure.");
         /* keep going — wifi.c retries forever, scope shows LINK LOST */
     }
     boot_pause();
 
-    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&sntp);
-    radar_boot_line("ZULU CLOCK", "SYNC", false);
-    boot_pause();
+    if (connected) {
+#if GEOLOCATE_ENABLE
+        double lat, lon;
+        if (geoloc_resolve(&lat, &lon) == ESP_OK) {
+            config_set_location(lat, lon);
+            radar_boot_line("GEO FIX", "OK", false);
+        } else {
+            radar_boot_line("GEO FIX", "DFLT", false);
+        }
+        boot_pause();
+#endif
+        esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        esp_netif_sntp_init(&sntp);
+        radar_boot_line("ZULU CLOCK", "SYNC", false);
+        boot_pause();
+    }
 
     adsb_start();
     radar_boot_line("DATALINK", "ACQ", false);
@@ -73,7 +99,9 @@ void app_main(void)
     ESP_LOGI(TAG, "scope running");
 
     for (;;) {
-        radar_tick();           /* render + flush, ~12 ms of SPI inside */
+        radar_tick();               /* render + flush, ~12 ms of SPI inside */
+        if (button_poll())          /* side button -> Wi-Fi setup portal */
+            provision_run();        /* never returns (reboots after save) */
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }

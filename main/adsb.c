@@ -17,12 +17,14 @@
 #include "cJSON.h"
 #include "adsb.h"
 #include "wifi.h"
+#include "config.h"
 #include "app_config.h"
 
 static const char *TAG = "adsb";
 
 static adsb_state_t s_state;
 static SemaphoreHandle_t s_lock;
+static TaskHandle_t s_task;
 
 /* contacts collected during the fetch in progress */
 static contact_t s_incoming[MAX_CONTACTS];
@@ -110,10 +112,12 @@ static void jstream_feed(jstream_t *p, const char *data, int n)
 
 static void latlon_to_km(double lat, double lon, float *east, float *north)
 {
+    const double home_lat = config_home_lat();
+    const double home_lon = config_home_lon();
     const double km_per_deg_lat = 110.574;
-    const double km_per_deg_lon = 111.320 * cos(HOME_LAT * M_PI / 180.0);
-    *east  = (float)((lon - HOME_LON) * km_per_deg_lon);
-    *north = (float)((lat - HOME_LAT) * km_per_deg_lat);
+    const double km_per_deg_lon = 111.320 * cos(home_lat * M_PI / 180.0);
+    *east  = (float)((lon - home_lon) * km_per_deg_lon);
+    *north = (float)((lat - home_lat) * km_per_deg_lat);
 }
 
 static void contact_from_json(const char *json)
@@ -238,7 +242,7 @@ static bool fetch_once(void)
 {
     char url[160];
     snprintf(url, sizeof(url), "%s/v2/point/%.4f/%.4f/%d",
-             ADSB_BASE_URL, (double)HOME_LAT, (double)HOME_LON,
+             ADSB_BASE_URL, config_home_lat(), config_home_lon(),
              (int)FETCH_RADIUS_NM);
 
     esp_http_client_config_t cfg = {
@@ -313,7 +317,12 @@ static void adsb_task(void *arg)
 void adsb_start(void)
 {
     s_lock = xSemaphoreCreateMutex();
-    xTaskCreate(adsb_task, "adsb", 12288, NULL, 4, NULL);
+    xTaskCreate(adsb_task, "adsb", 12288, NULL, 4, &s_task);
+}
+
+void adsb_suspend(void)
+{
+    if (s_task) vTaskSuspend(s_task);
 }
 
 void adsb_snapshot(adsb_state_t *out)

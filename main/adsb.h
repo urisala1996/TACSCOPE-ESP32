@@ -31,5 +31,6 @@ typedef struct {
 } adsb_state_t;
 
 void adsb_start(void);
+void adsb_suspend(void);   /* pause the fetch task (used during provisioning) */
 /* Copy a consistent snapshot of the shared state for rendering. */
 void adsb_snapshot(adsb_state_t *out);

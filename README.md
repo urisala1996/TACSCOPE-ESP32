@@ -9,6 +9,8 @@ rotating sweep with afterglow — all from a free, no-registration ADS-B API.
 
 - Live ADS-B traffic — no API key, no account required
 - Phosphor-green military aesthetic with rotating sweep and glow trail
+- **On-device Wi-Fi setup** — a captive SoftAP portal, no recompiling to change networks
+- **Automatic geolocation** — the scope centers itself from nearby Wi-Fi access points
 - Tap any blip to see callsign, flight level, ground speed, bearing and distance
 - Tap empty scope area to cycle display range: 10 / 25 / 50 / 100 km
 - Up to 6-step position trail per contact; closest 24 contacts always kept
@@ -39,6 +41,7 @@ rotating sweep with afterglow — all from a free, no-registration ADS-B API.
 | Touch SCL | 5 |
 | Touch RST | 1 |
 | Touch INT | 0 (strapping pin — polled, not IRQ) |
+| Side / BOOT button | 9 (active-low — opens Wi-Fi setup portal) |
 
 ## Data source
 
@@ -69,9 +72,12 @@ Edit `main/app_config.h` — this is the **only file you need to touch**:
 
 | Setting | Description |
 |---------|-------------|
-| `WIFI_SSID` | Your 2.4 GHz network name |
-| `WIFI_PASS` | Your Wi-Fi password |
-| `HOME_LAT` / `HOME_LON` | Scope center in decimal degrees — right-click your location in Google Maps and choose *Copy coordinates* |
+| `WIFI_SSID` | Your 2.4 GHz network name — *optional*, can also be set on-device (see below). Leave blank to force the setup portal on first boot |
+| `WIFI_PASS` | Your Wi-Fi password (fallback only) |
+| `PROV_AP_SSID` | Name of the setup access point shown in provisioning mode |
+| `HOME_LAT` / `HOME_LON` | Fallback scope center in decimal degrees, used only if geolocation is off or fails — right-click your location in Google Maps and choose *Copy coordinates* |
+| `GEOLOCATE_ENABLE` | `1` to auto-locate the scope from nearby Wi-Fi; `0` to always use `HOME_LAT`/`HOME_LON` |
+| `GEOLOCATE_URL` | MLS-compatible geolocation endpoint (default: free, keyless beaconDB) |
 | `ADSB_BASE_URL` | API base URL (see table above) |
 | `FETCH_RADIUS_NM` | Radius to request from the API in nautical miles (default 60, max 250) |
 | `REFRESH_INTERVAL_S` | Seconds between refreshes (default 10, minimum 5) |
@@ -98,6 +104,33 @@ idf.py -p COMx flash monitor
 Replace `COMx` with your device's serial port (`COM11` on Windows, `/dev/ttyUSB0`
 on Linux/macOS).
 
+## Wi-Fi setup & location
+
+You don't have to hard-code your network. TACSCOPE can be configured entirely
+on the device:
+
+**Provisioning portal**
+
+- It starts automatically when no credentials are stored (e.g. first boot with a
+  blank `WIFI_SSID`), or any time you **press the side (BOOT) button**.
+- The display shows *LINK SETUP*. Join the open Wi-Fi network **`TACSCOPE-SETUP`**
+  from your phone or laptop.
+- A captive portal pops up (or browse to **`http://192.168.4.1`**). Enter your
+  network name and password and tap **ESTABLISH LINK**.
+- Credentials are saved to flash and the device reboots and connects. To change
+  networks later, just press the side button again.
+
+**Automatic geolocation**
+
+- On boot (when `GEOLOCATE_ENABLE` is `1`), the scope scans the surrounding
+  Wi-Fi access points and asks an MLS-compatible service (free, keyless
+  [beaconDB](https://beacondb.net) by default) for its position — the boot
+  screen shows `GEO FIX OK`.
+- If the lookup fails (no coverage, offline, service down) it shows
+  `GEO FIX DFLT` and falls back to `HOME_LAT` / `HOME_LON`.
+- Accuracy depends on how many of the nearby access points are in the database;
+  it is typically good in urban areas and may miss in rural ones.
+
 ## Controls
 
 | Action | Effect |
@@ -105,6 +138,7 @@ on Linux/macOS).
 | Tap an aircraft blip | Select it — displays callsign, flight level, ground speed, bearing and distance |
 | Tap the selected blip again | Deselect |
 | Tap empty scope area | Cycle display range: 10 → 25 → 50 → 100 km |
+| Press side (BOOT) button | Open the Wi-Fi setup portal (reconfigure your network) |
 
 ## Display legend
 
@@ -128,11 +162,16 @@ Air-Traffic/
 │   ├── main.c                 Boot sequence and main render loop
 │   ├── display.c/h            GC9A01 via esp_lcd + LEDC backlight
 │   ├── touch.c/h              CST816D polled I2C driver
+│   ├── button.c/h             Side/BOOT button (GPIO9), debounced
 │   ├── gfx.c/h                Software renderer (banded RGB565 DMA framebuffer)
+│   ├── theme.h                Shared phosphor-green palette + scope geometry
 │   ├── font5x7.c/h            5×7 bitmap font, 95 printable ASCII characters
+│   ├── config.c/h             Runtime config store (Wi-Fi creds in NVS, location)
 │   ├── adsb.c/h               HTTPS fetch task + streaming JSON parser
 │   ├── radar.c/h              PPI scope rendering, sweep, touch interaction
-│   └── wifi.c/h               Wi-Fi STA with auto-reconnect
+│   ├── geoloc.c/h             Wi-Fi access-point geolocation (MLS-compatible)
+│   ├── provision.c/h          SoftAP captive portal for on-device Wi-Fi setup
+│   └── wifi.c/h               Wi-Fi STA + SoftAP, auto-reconnect
 ├── partitions.csv             Custom partition table (3 MB app slot)
 ├── sdkconfig.defaults         Build configuration baseline
 ├── CMakeLists.txt

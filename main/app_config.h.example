@@ -7,14 +7,31 @@
 #pragma once
 
 /* ---------------------------------------------------------------- Wi-Fi -- */
+/* These are only DEFAULTS / fallbacks. Wi-Fi can also be configured on the
+ * device: press the side (BOOT) button at any time to open the setup portal,
+ * or leave WIFI_SSID blank ("") to start it automatically on first boot.
+ * Credentials entered on the device are saved to flash and take priority. */
 #define WIFI_SSID               "your-network-name"
 #define WIFI_PASS               "your-password"
 
+/* SoftAP name shown while in provisioning mode (open network). */
+#define PROV_AP_SSID            "TACSCOPE-SETUP"
+
 /* ------------------------------------------------------- Radar position -- */
-/* The center of the scope (your location), decimal degrees.
+/* The scope center. On boot TACSCOPE tries to fix its position from nearby
+ * Wi-Fi networks (see GEOLOCATE below); these values are the fallback used
+ * only when that lookup is disabled or fails.
  * Tip: right-click your location in Google Maps → "Copy coordinates". */
 #define HOME_LAT                0.0
 #define HOME_LON                0.0
+
+/* --------------------------------------------------------- Geolocation --- */
+/* Resolve the scope center automatically from surrounding Wi-Fi access points,
+ * using an MLS-compatible service. beaconDB is free and needs no API key
+ * (Mozilla Location Services itself was retired in 2024). Set to 0 to always
+ * use HOME_LAT/HOME_LON above. */
+#define GEOLOCATE_ENABLE        1
+#define GEOLOCATE_URL           "https://api.beacondb.net/v1/geolocate"
 
 /* ----------------------------------------------------------- Data source -- */
 /* Free ADS-B aggregators, NO API key required. Pick one:

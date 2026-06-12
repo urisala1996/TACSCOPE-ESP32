@@ -5,7 +5,11 @@ idf_component_register(
         "font5x7.c"
         "display.c"
         "touch.c"
+        "button.c"
+        "config.c"
         "wifi.c"
+        "geoloc.c"
+        "provision.c"
         "adsb.c"
         "radar.c"
     INCLUDE_DIRS "."
@@ -17,8 +21,10 @@ idf_component_register(
         esp_event
         nvs_flash
         esp_http_client
+        esp_http_server
         esp-tls
         mbedtls
+        lwip
         json
         esp_timer
 )

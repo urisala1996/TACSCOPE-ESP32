@@ -7,6 +7,7 @@
 #include <time.h>
 #include "esp_timer.h"
 #include "gfx.h"
+#include "theme.h"
 #include "display.h"
 #include "touch.h"
 #include "wifi.h"
@@ -14,23 +15,9 @@
 #include "radar.h"
 #include "app_config.h"
 
-#define CX 120
-#define CY 120
 #define PLOT_R   100        /* contacts plotted inside this radius      */
-#define BEZEL_R  116        /* outer tick ring                          */
 #define SWEEP_PERIOD_US 4000000
 #define SWEEP_TAIL_STEPS 26
-
-/* palette (phosphor green / amber accents) */
-#define C_BG       gfx_rgb(0, 10, 2)
-#define C_GRID     gfx_rgb(0, 70, 24)
-#define C_GRID_DIM gfx_rgb(0, 44, 14)
-#define C_TEXT     gfx_rgb(0, 200, 80)
-#define C_TEXT_DIM gfx_rgb(0, 110, 45)
-#define C_BLIP     gfx_rgb(60, 255, 120)
-#define C_TRAIL    gfx_rgb(0, 120, 50)
-#define C_SEL      gfx_rgb(255, 190, 40)
-#define C_ALERT    gfx_rgb(255, 60, 40)
 
 static const int s_ranges_km[] = RANGE_STEPS_KM;
 #define N_RANGES ((int)(sizeof(s_ranges_km) / sizeof(s_ranges_km[0])))
