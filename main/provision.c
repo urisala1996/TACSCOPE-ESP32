@@ -36,7 +36,10 @@ static volatile int    s_clients;     /* stations joined to the SoftAP */
 
 /* --------------------------------------------------------------- portal -- */
 
-static const char PAGE[] =
+/* The page is sent in three chunks: a static head (with CSS, which contains '%'
+ * characters that must not reach snprintf), a dynamic middle holding the input
+ * fields pre-filled with the current values, and a static tail. */
+static const char PAGE_HEAD[] =
 "<!DOCTYPE html><html><head><meta charset=utf-8>"
 "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
 "<title>TACSCOPE SETUP</title><style>"
@@ -48,14 +51,13 @@ static const char PAGE[] =
 "button{margin-top:26px;width:100%;background:#0e5a22;color:#bfffd0;border:none;"
 "padding:14px;font-family:monospace;font-size:16px;letter-spacing:2px}"
 ".f{color:#0e6a2a;font-size:11px;margin-top:22px;text-align:center;letter-spacing:1px}"
+".h{color:#0e6a2a;font-size:11px;margin:4px 0 0}"
 "</style></head><body>"
 "<h1>TACSCOPE // LINK SETUP</h1>"
-"<form method=POST action=/save>"
-"<label>NETWORK SSID</label>"
-"<input name=ssid maxlength=32 autocomplete=off autofocus>"
-"<label>PASSPHRASE</label>"
-"<input name=pass type=password maxlength=63 autocomplete=off>"
-"<button type=submit>ESTABLISH LINK</button>"
+"<form method=POST action=/save>";
+
+static const char PAGE_TAIL[] =
+"<button type=submit>SAVE &amp; RESTART</button>"
 "</form>"
 "<div class=f>AN/ESP 2424S012 &nbsp;&middot;&nbsp; AIR SURVEILLANCE</div>"
 "</body></html>";
@@ -116,10 +118,52 @@ static void form_field(const char *body, const char *key,
     }
 }
 
+/* Escape a string for use inside an HTML double-quoted attribute value. */
+static void html_escape(const char *in, char *out, size_t out_sz)
+{
+    size_t o = 0;
+    for (const char *p = in; *p && o + 7 < out_sz; p++) {
+        const char *rep = NULL;
+        switch (*p) {
+        case '&': rep = "&amp;";  break;
+        case '"': rep = "&quot;"; break;
+        case '<': rep = "&lt;";   break;
+        case '>': rep = "&gt;";   break;
+        default:  out[o++] = *p;  continue;
+        }
+        size_t rl = strlen(rep);
+        memcpy(out + o, rep, rl);
+        o += rl;
+    }
+    out[o] = '\0';
+}
+
 static esp_err_t root_get(httpd_req_t *r)
 {
+    static char ssid_e[208], pass_e[400], lat_s[320], lon_s[320], mid[1792];
+    html_escape(config_wifi_ssid(), ssid_e, sizeof(ssid_e));
+    html_escape(config_wifi_pass(), pass_e, sizeof(pass_e));
+    /* lat/lon are bounded to valid ranges, so these never grow long */
+    snprintf(lat_s, sizeof(lat_s), "%.6f", config_home_lat());
+    snprintf(lon_s, sizeof(lon_s), "%.6f", config_home_lon());
+
+    snprintf(mid, sizeof(mid),
+        "<label>NETWORK SSID</label>"
+        "<input name=ssid maxlength=32 autocomplete=off value=\"%s\">"
+        "<label>PASSPHRASE</label>"
+        "<input name=pass type=password maxlength=63 autocomplete=off value=\"%s\">"
+        "<p class=h>Leave Wi-Fi fields as-is to only change position.</p>"
+        "<label>LATITUDE</label>"
+        "<input name=lat maxlength=12 inputmode=decimal value=\"%s\">"
+        "<label>LONGITUDE</label>"
+        "<input name=lon maxlength=12 inputmode=decimal value=\"%s\">",
+        ssid_e, pass_e, lat_s, lon_s);
+
     httpd_resp_set_type(r, "text/html");
-    return httpd_resp_send(r, PAGE, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(r, PAGE_HEAD, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(r, mid, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send_chunk(r, PAGE_TAIL, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_send_chunk(r, NULL, 0);
 }
 
 static esp_err_t redirect_get(httpd_req_t *r)
@@ -142,13 +186,32 @@ static esp_err_t save_post(httpd_req_t *r)
     }
     buf[got] = '\0';
 
-    char ssid[33], pass[64];
+    char ssid[33], pass[64], lats[24], lons[24];
     form_field(buf, "ssid", ssid, sizeof(ssid));
     form_field(buf, "pass", pass, sizeof(pass));
+    form_field(buf, "lat", lats, sizeof(lats));
+    form_field(buf, "lon", lons, sizeof(lons));
 
-    httpd_resp_set_type(r, "text/html");
+    bool changed = false;
     if (ssid[0]) {
         config_set_wifi(ssid, pass);
+        changed = true;
+    }
+
+    /* both coordinates must parse and be in range to update the position */
+    if (lats[0] && lons[0]) {
+        char *le, *oe;
+        double lat = strtod(lats, &le);
+        double lon = strtod(lons, &oe);
+        if (le != lats && oe != lons &&
+            lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0) {
+            config_save_location(lat, lon);
+            changed = true;
+        }
+    }
+
+    httpd_resp_set_type(r, "text/html");
+    if (changed) {
         httpd_resp_send(r, SAVED_PAGE, HTTPD_RESP_USE_STRLEN);
         s_saved = true;             /* picked up by the render loop -> reboot */
     } else {

@@ -18,4 +18,6 @@ esp_err_t   config_set_wifi(const char *ssid, const char *pass); /* save to NVS 
 
 double config_home_lat(void);
 double config_home_lon(void);
-void   config_set_location(double lat, double lon); /* RAM only (geolocation) */
+bool   config_has_location(void);                    /* a location was saved by the user */
+void   config_set_location(double lat, double lon);  /* RAM only (geolocation) */
+esp_err_t config_save_location(double lat, double lon); /* persist to NVS (portal) */

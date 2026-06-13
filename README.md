@@ -115,10 +115,17 @@ on the device:
   blank `WIFI_SSID`), or any time you **press the side (BOOT) button**.
 - The display shows *LINK SETUP*. Join the open Wi-Fi network **`TACSCOPE-SETUP`**
   from your phone or laptop.
-- A captive portal pops up (or browse to **`http://192.168.4.1`**). Enter your
-  network name and password and tap **ESTABLISH LINK**.
-- Credentials are saved to flash and the device reboots and connects. To change
-  networks later, just press the side button again.
+- A captive portal pops up (or browse to **`http://192.168.4.1`**). The form is
+  pre-filled with the current Wi-Fi and position, so you can change any of it.
+- It also has **Latitude / Longitude** fields. Leave the Wi-Fi fields untouched
+  and edit only the coordinates to reposition the scope without retyping your
+  network. Tap **SAVE & RESTART**.
+- Everything is saved to flash and the device reboots and connects. To change
+  networks or location later, just press the side button again.
+
+> A manually entered position **takes priority over auto-geolocation** — once
+> you set coordinates here, the boot screen shows `GEO FIX MAN` and the Wi-Fi
+> lookup is skipped. (Geolocation isn't always available; see below.)
 
 **Automatic geolocation**
 

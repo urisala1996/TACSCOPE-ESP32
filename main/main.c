@@ -75,16 +75,22 @@ void app_main(void)
     boot_pause();
 
     if (connected) {
-#if GEOLOCATE_ENABLE
-        double lat, lon;
-        if (geoloc_resolve(&lat, &lon) == ESP_OK) {
-            config_set_location(lat, lon);
-            radar_boot_line("GEO FIX", "OK", false);
+        if (config_has_location()) {
+            /* user set the scope center by hand — it wins over geolocation */
+            radar_boot_line("GEO FIX", "MAN", false);
+            boot_pause();
         } else {
-            radar_boot_line("GEO FIX", "DFLT", false);
-        }
-        boot_pause();
+#if GEOLOCATE_ENABLE
+            double lat, lon;
+            if (geoloc_resolve(&lat, &lon) == ESP_OK) {
+                config_set_location(lat, lon);
+                radar_boot_line("GEO FIX", "OK", false);
+            } else {
+                radar_boot_line("GEO FIX", "DFLT", false);
+            }
+            boot_pause();
 #endif
+        }
         esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
         esp_netif_sntp_init(&sntp);
         radar_boot_line("ZULU CLOCK", "SYNC", false);
